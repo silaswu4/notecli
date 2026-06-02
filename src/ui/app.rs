@@ -343,7 +343,7 @@ impl App {
         let sub = step_pos % 4 + 1;
 
         let brand = Span::styled(
-            " ✷ tek ",
+            " ✷ noteCLI ",
             Style::default().fg(theme::ACCENT_HI).add_modifier(Modifier::BOLD),
         );
         let transport_icon = Span::styled(
@@ -1284,7 +1284,7 @@ impl App {
     }
 
     fn save_project(&mut self) {
-        let path = PathBuf::from(format!("{}.tek.toml", self.project.name));
+        let path = PathBuf::from(format!("{}.notecli.toml", self.project.name));
         match toml::to_string_pretty(&self.project) {
             Ok(s) => {
                 if std::fs::write(&path, s).is_ok() {

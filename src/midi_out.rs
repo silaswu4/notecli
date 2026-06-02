@@ -17,15 +17,15 @@ pub enum MidiOutMessage {
     AllNotesOff { channel: u8 },
 }
 
-/// open a virtual midi output port called "tek-out". any daw on the system
-/// can pick it as a midi input source. on macos this shows up under the
-/// iac driver list. returns None gracefully if midi isn't available.
+/// open a virtual midi output port called "noteCLI-out". any daw on the
+/// system can pick it as a midi input source. on macos this shows up under
+/// the iac driver list. returns None gracefully if midi isn't available.
 pub fn spawn_worker(mut rx: HeapCons<MidiOutMessage>) -> Result<Option<thread::JoinHandle<()>>> {
-    let out = match MidiOutput::new("tek") {
+    let out = match MidiOutput::new("noteCLI") {
         Ok(o) => o,
         Err(_) => return Ok(None),
     };
-    let conn = match out.create_virtual("tek-out") {
+    let conn = match out.create_virtual("noteCLI-out") {
         Ok(c) => c,
         Err(_) => return Ok(None),
     };

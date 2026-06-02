@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     let project_handle = Arc::new(ArcSwap::new(Arc::new(project.clone())));
     let transport = Arc::new(Transport::new(project.bpm));
 
-    // ---- launch any standalone synths the project wants alongside tek ----
+    // ---- launch any standalone synths the project wants alongside noteCLI ----
     launch_external_apps(&project);
 
     // ---- ringbuf for ui -> audio commands ----
@@ -157,7 +157,7 @@ fn main() -> Result<()> {
 
 /// walks every channel and tries to open any standalone .app it asks for.
 /// uses macos `open -a` so any installed app name resolves. silently ignores
-/// failures so a missing install doesn't block tek from starting.
+/// failures so a missing install doesn't block noteCLI from starting.
 fn launch_external_apps(project: &Project) {
     use std::collections::HashSet;
     use std::process::Command;

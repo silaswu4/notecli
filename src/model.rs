@@ -146,7 +146,7 @@ pub struct MidiOutParams {
     pub channel: u8,
     /// base pitch each step plays. defaults to c4 (60).
     pub pitch: u8,
-    /// name of a standalone .app to launch alongside tek. typical values:
+    /// name of a standalone .app to launch alongside noteCLI. typical values:
     /// "Vital", "Serum", "Massive X". omit if you'd rather launch yourself.
     /// looked up via macos `open -a`, so any installed app name works.
     #[serde(default)]

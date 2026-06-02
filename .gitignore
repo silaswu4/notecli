@@ -3,4 +3,4 @@
 *.swp
 *.swo
 projects/
-*.tek.toml
+*.notecli.toml

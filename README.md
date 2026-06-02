@@ -1,6 +1,6 @@
-# tek
+# noteCLI
 
-fl-studio-style daw that lives in your terminal. ratatui ui, cpal audio, built-in drum synth + subtractive synth, wav sample loading.
+fl-studio-style daw that lives in your terminal. ratatui ui, cpal audio, built-in drum synth + subtractive synth, wav sample loading, virtual midi out to drive serum / vital / any vst, claude agent for pattern generation.
 
 ## what works
 
@@ -14,12 +14,16 @@ fl-studio-style daw that lives in your terminal. ratatui ui, cpal audio, built-i
 - built-in subtractive synth: sine, triangle, saw, square, noise with adsr + lowpass
 - sample player with linear-interpolation pitch shift
 - midi input from the first connected device
+- midi out via a virtual port called `noteCLI-out`, can drive vital or any vst host
+- auto-launches a configured standalone synth (defaults to vital) on startup
 - schroeder reverb on a global send
+- claude agent for one-shot pattern generation (`g`) and 3-variation generation (`G`)
+- mouse support: click steps to toggle, click tabs to switch views, scroll to navigate
 - save / load projects as toml
 
 ## stack
 
-cpal for audio, ratatui + crossterm for the tui, hound for wav, midir for midi, arc-swap + ringbuf for the audio↔ui channel, serde + toml for persistence. one binary, no electron, no node.
+cpal for audio, ratatui + crossterm for the tui, hound for wav, midir for midi, arc-swap + ringbuf for the audio↔ui channel, serde + toml for persistence, ureq for the claude api calls. one binary, no electron, no node.
 
 ## install + run
 
@@ -27,7 +31,7 @@ cpal for audio, ratatui + crossterm for the tui, hound for wav, midir for midi, 
 cargo run --release
 ```
 
-first launch starts with a default project: 5 drum channels, 2 synth channels, a single pattern with a basic four-on-the-floor on the kick + snare on 2 / 4 + hat on the off-eighths. press space and you should hear it. headphones recommended, the kick punches.
+first launch starts with a default project: 5 drum channels, 2 synth channels, one pattern with a basic four-on-the-floor on the kick + snare on 2 / 4 + hat on the off-eighths. press space and you should hear it. headphones recommended, the kick punches.
 
 ## keys
 
@@ -40,7 +44,7 @@ global:
 | `1` `2` `3` `4` `5` | switch view: channels / piano / playlist / mixer / browser |
 | `q` | quit |
 | `,` `.` | bpm down / up |
-| `ctrl-s` | save project to `<name>.tek.toml` |
+| `ctrl-s` | save project to `<name>.notecli.toml` |
 
 channel rack:
 
@@ -55,8 +59,10 @@ channel rack:
 | `[` `]` | previous / next pattern |
 | `n` | new pattern |
 | `a` | append a new synth channel |
-| `tab` | cycle the focused channel's kind (drum / synth) |
+| `tab` | cycle the focused channel's kind (drum → synth → midi-out → drum) |
 | `p` | preview the focused channel |
+| `g` | open the agent prompt modal (generates a pattern) |
+| `G` | open the variation modal (generates 3 variations) |
 
 piano roll:
 
@@ -91,21 +97,43 @@ sample browser:
 | `enter` | open a directory, or load a wav into the focused channel |
 | `space` | preview message (audition routing tbd) |
 
+modal input (`g` / `G` for agent):
+
+| key | what it does |
+|-----|--------------|
+| `enter` | send |
+| `esc` | cancel |
+| `backspace` | delete last char |
+
 ## using your own samples
 
-put any wav into a directory you can find, open the browser with `5`, navigate to it, press `enter` on a `.wav` file. it loads into the focused channel as a sampler. step trigger plays the sample, and the pitch can be shifted in semitones with the sampler's `pitch_semitones` field (currently editable via project toml).
+drop any wav into a directory you can find, open the browser with `5`, navigate to it, press `enter` on a `.wav` file. it loads into the focused channel as a sampler. step trigger plays the sample, and the pitch can be shifted in semitones with the sampler's `pitch_semitones` field (currently editable via project toml).
 
 `hound` only reads wav for v1. mp3 / flac / ogg can be added by swapping the loader for `symphonia` later.
 
 ## driving serum / vital / any vst
 
-terminals can't host vst3 plugins (vsts need a gui window handle). the workable path is to drive your real daw or a standalone host from tek over midi:
+noteCLI doesn't host vsts (vsts need a gui window handle that terminals can't provide). instead it opens a virtual midi port called `noteCLI-out` on launch, and on macos it'll also try to `open -a Vital` so the standalone vital app pops up alongside it.
 
-1. on macos, open audio midi setup → midi studio → enable the iac driver and create a bus (name it whatever, "tek bus" works).
-2. open logic / ableton / bitwig / studio one with serum or vital loaded on a track, set that track's midi input to the iac bus.
-3. start tek. by default it grabs the first available midi input device, but for output to serum the plan is a `ChannelKind::MidiOut` variant that the engine sends notes to instead of triggering an internal voice. that variant lands in the next pass.
+routing:
 
-immediate workaround until midi out lands: use the built-in synth + drums for the rhythm scratch and route audio out of tek into your interface, then play serum manually over the top from your daw.
+1. with both apps running, in vital's settings find midi input and select `noteCLI-out`.
+2. in noteCLI, cycle a channel to `midi` kind by pressing `tab` on it. each step on that channel sends a note on midi channel 1 to the virtual port. vital receives, plays its current patch.
+3. if you'd rather use serum (or massive x, or anything else), edit the channel's `launch_app` field in the saved `.notecli.toml` and it'll launch that on next start.
+
+the engine tracks the last note sent per channel and releases it before the next hit, so notes never stack up. transport stop also sends note-off to every ringing midi note.
+
+## the claude agent
+
+press `g` on the channel rack view. a modal opens. type a vibe (`"dusty boom-bap at 86"`, `"garage house with skip on hat"`, whatever) and hit enter. noteCLI sends the description plus the current channel list to claude sonnet 4.6 and applies the returned step grid to the active pattern. mentioning a tempo in the prompt updates the bpm.
+
+press `G` (shift+g) for variations. an optional direction hint modal opens (or just hit enter to skip). the agent returns 3 musically related but distinct variations and appends them as new patterns named `agent 01`, `agent 02`, `agent 03`. flip through them with `[` / `]`.
+
+requires `ANTHROPIC_API_KEY` in your env. the call takes ~3-5 seconds; the status bar shows `thinking…` while in flight and the ui keeps responding because the request runs on a worker thread.
+
+## pattern wrap-cut
+
+every time the playhead wraps from step 15 back to step 0, the engine kills every active voice and releases every midi note. nothing carries over between loop iterations, so synth tails, drum decays, and held midi notes all reset on the bar line. this prevents voices from stacking up over long loops.
 
 ## project file format
 
@@ -133,31 +161,38 @@ content = "Kick"
 ## architecture
 
 ```
-ui thread (main)            audio thread (cpal)
-─────────────────           ───────────────────
-project mut ─┐                       │
-             ├──► ArcSwap<Project> ──┤
-             │                       │
-keypresses ──┘                       │
-             ┌─► ringbuf <Command> ──┤
-midi input ──┘                       │
-                                     │
-                              engine renders:
-                              · pulls latest project snapshot
-                              · drains commands
-                              · per frame: check tick boundary,
-                                fire step events, render voices
-                              · stereo accumulator → reverb send
-                                → soft clip → master out
+ui thread (main)            audio thread (cpal)            midi-out thread
+─────────────────           ───────────────────            ───────────────
+project mut ─┐                       │                            │
+             ├──► ArcSwap<Project> ──┤                            │
+             │                       │                            │
+keypresses ──┘                       │                            │
+             ┌─► ringbuf <Command> ──┤                            │
+mouse ───────┤                       │                            │
+midi input ──┘                       │                            │
+                                     │                            │
+                              engine renders:                     │
+                              · pulls latest project              │
+                              · drains commands                   │
+                              · per frame: tick check,            │
+                                step events, voices               │
+                              · midi-out channels:                │
+                                push to midi ringbuf ─────────────┤
+                              · accumulator → reverb              │
+                                send → soft clip                  │
+                                                                  │
+                                                          midir sends bytes
+                                                          to noteCLI-out
+                                                          virtual port
 ```
 
-the audio thread never allocates, never locks. project mutations are arc-cloned and atomically swapped by the ui thread. immediate triggers (transport, audition, midi notes) cross via the ringbuf.
+the audio thread never allocates, never locks. project mutations are arc-cloned and atomically swapped by the ui thread. immediate triggers (transport, audition, midi notes) cross via ringbuf. agent calls run on their own worker threads to keep the ui responsive.
 
 ## directory layout
 
 ```
 src/
-├── main.rs              entry, cpal setup, terminal lifecycle
+├── main.rs              entry, cpal setup, terminal lifecycle, app launching
 ├── transport.rs         shared atomic transport state
 ├── command.rs           ui → audio messages
 ├── model.rs             project / channel / pattern / step / note
@@ -165,6 +200,8 @@ src/
 ├── voice.rs             enum-dispatched voice (drum / synth / sampler)
 ├── engine.rs            the audio engine itself
 ├── midi.rs              midi input
+├── midi_out.rs          virtual midi output port + worker thread
+├── agent.rs             claude api integration for pattern generation
 ├── dsp/
 │   ├── osc.rs           polyblep oscillators + noise
 │   ├── env.rs           adsr
@@ -172,7 +209,7 @@ src/
 │   ├── drums.rs         procedural kick / snare / hat / clap / tom
 │   └── reverb.rs        schroeder reverb
 └── ui/
-    ├── app.rs           main app state + key dispatch
+    ├── app.rs           main app state + key dispatch + agent modal
     ├── theme.rs         palette
     └── views/
         ├── channels.rs  channel rack
@@ -184,10 +221,9 @@ src/
 
 ## what's missing
 
-- midi-out (planned, see above)
-- pattern length other than 16 steps
 - per-step velocity / pitch editing in the channel rack ui
 - automation lanes
 - audio file playback in the playlist (currently only patterns)
 - multi-format sample loading (mp3 / flac / ogg)
+- ui editor for midi-out channel / pitch (currently set via toml)
 - vst / clap hosting (probably never; midi out is the real path)

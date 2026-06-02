@@ -14,7 +14,7 @@ pub fn open_default(
     cmd_tx: Arc<Mutex<HeapProd<Command>>>,
     armed_channel: Arc<std::sync::atomic::AtomicU16>,
 ) -> Result<Option<MidiInputConnection<()>>> {
-    let input = MidiInput::new("tek")?;
+    let input = MidiInput::new("noteCLI")?;
     let ports = input.ports();
     if ports.is_empty() {
         return Ok(None);
@@ -23,7 +23,7 @@ pub fn open_default(
     let _port_name = input.port_name(port).unwrap_or_default();
     let conn = input.connect(
         port,
-        "tek-input",
+        "noteCLI-input",
         move |_stamp, message, _| {
             if message.len() < 3 {
                 return;

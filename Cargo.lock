@@ -883,6 +883,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "notecli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "cpal",
+ "crossterm",
+ "hound",
+ "midir",
+ "ratatui",
+ "ringbuf",
+ "serde",
+ "serde_json",
+ "toml",
+ "ureq",
+ "walkdir",
+]
+
+[[package]]
 name = "num-derive"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1401,25 +1420,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tek"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arc-swap",
- "cpal",
- "crossterm",
- "hound",
- "midir",
- "ratatui",
- "ringbuf",
- "serde",
- "serde_json",
- "toml",
- "ureq",
- "walkdir",
 ]
 
 [[package]]

@@ -1,13 +1,13 @@
 [package]
-name = "tek"
+name = "notecli"
 version = "0.1.0"
 edition = "2021"
-description = "fl studio in your terminal. step sequencer, piano roll, mixer, sample loading, all in ratatui."
-authors = ["silas wu"]
+description = "noteCLI. fl studio in your terminal. step sequencer, piano roll, mixer, sample loading, all in ratatui."
+authors = ["silaswu4"]
 license = "MIT"
 
 [[bin]]
-name = "tek"
+name = "notecli"
 path = "src/main.rs"
 
 [dependencies]
