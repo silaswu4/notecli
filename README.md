@@ -1,6 +1,12 @@
 # noteCLI
 
-fl-studio-style daw that lives in your terminal. ratatui ui, cpal audio, built-in drum synth + subtractive synth, wav sample loading, virtual midi out to drive serum / vital / any vst, claude agent for pattern generation.
+fl-studio-style daw that lives in your terminal. channel rack, piano roll, playlist, mixer, sample browser. it synthesizes its own drums and synth voices in real time, loads your wav files, drives external vsts over virtual midi, and can hand a vibe to claude and get back a pattern.
+
+ratatui for the ui, cpal for audio, written in rust. one binary, no electron, no node, no daw window. you run `cargo run --release`, press space, and it makes sound.
+
+## why
+
+i wanted to write a sequencer where the interesting part is real: a lock-free audio engine that renders procedural drums and a subtractive synth from scratch, never allocating or locking on the audio thread, while a full tui sits on top of it. it isn't a wrapper around someone else's audio backend. the oscillators, the adsr, the biquad filter, the schroeder reverb, the voice allocation, and the loop-accurate step timing are all in `src/`. the claude integration is a nice toy on top of an engine that stands on its own.
 
 ## what works
 
@@ -27,9 +33,22 @@ cpal for audio, ratatui + crossterm for the tui, hound for wav, midir for midi, 
 
 ## install + run
 
+needs a rust toolchain (`rustup`) and, on linux, alsa dev headers (`libasound2-dev`) for cpal and midir. macos works out of the box.
+
+run it straight from the repo:
+
 ```bash
 cargo run --release
 ```
+
+or build an optimized binary and install it on your path:
+
+```bash
+cargo build --release        # target/release/notecli
+cargo install --path .       # then just run: notecli
+```
+
+release builds use `lto = "thin"` and a single codegen unit, since this is realtime audio and the engine should be as tight as the optimizer can make it.
 
 first launch starts with a default project: 5 drum channels, 2 synth channels, one pattern with a basic four-on-the-floor on the kick + snare on 2 / 4 + hat on the off-eighths. press space and you should hear it. headphones recommended, the kick punches.
 
