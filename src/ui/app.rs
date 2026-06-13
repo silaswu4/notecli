@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::command::Command;
-use crate::model::{Channel, ChannelKind, Note, OscKind, Project, Step, TICKS_PER_STEP};
+use crate::model::{Channel, ChannelKind, Note, OscKind, PatternTrack, Project, Step, TICKS_PER_STEP};
 use crate::sample::{is_audio_file, load_wav};
 use crate::transport::Transport;
 use crate::ui::theme;
@@ -1195,17 +1195,24 @@ impl App {
     fn add_note(&mut self) {
         let pat_id = self.project.active_pattern as usize;
         let ch_id = self.cursor_channel as u16;
+        let pitch = self.cursor_pitch;
+        let start = self.cursor_tick;
         if let Some(pattern) = self.project.patterns.get_mut(pat_id) {
+            let length = pattern.length;
             let track = pattern
                 .tracks
                 .entry(ch_id)
-                .or_insert_with(|| crate::model::PatternTrack::with_steps(pattern.length));
+                .or_insert_with(|| PatternTrack::with_steps(length));
             track.notes.push(Note {
-                pitch: self.cursor_pitch,
-                start: self.cursor_tick,
+                pitch,
+                start,
                 length: TICKS_PER_STEP,
                 velocity: 1.0,
             });
+            // mirror the note onto the channel rack so it lights up while the
+            // pattern plays. the step also drives the sequencer, so the note
+            // actually sounds at its pitch.
+            mirror_note_onto_step(track, length, pitch, start, 1.0);
         }
         self.commit();
     }
@@ -1213,13 +1220,25 @@ impl App {
     fn delete_note(&mut self) {
         let pat_id = self.project.active_pattern as usize;
         let ch_id = self.cursor_channel as u16;
+        let cp = self.cursor_pitch;
+        let ct = self.cursor_tick;
         if let Some(pattern) = self.project.patterns.get_mut(pat_id) {
             if let Some(track) = pattern.tracks.get_mut(&ch_id) {
-                let cp = self.cursor_pitch;
-                let ct = self.cursor_tick;
                 track.notes.retain(|n| {
                     !(n.pitch == cp && ct >= n.start && ct < n.start + n.length.max(1))
                 });
+                // clear the mirrored step only if no other note still lands on
+                // it, so deleting one note doesn't wipe a stacked neighbor.
+                let idx = (ct / TICKS_PER_STEP) as usize;
+                let still_used = track
+                    .notes
+                    .iter()
+                    .any(|n| (n.start / TICKS_PER_STEP) as usize == idx);
+                if !still_used {
+                    if let Some(step) = track.steps.get_mut(idx) {
+                        step.active = false;
+                    }
+                }
             }
         }
         self.commit();
@@ -1297,6 +1316,22 @@ impl App {
                 self.status = format!("serialize error: {}", e);
             }
         }
+    }
+}
+
+/// light the channel-rack step that a piano-roll note starts on, carrying its
+/// pitch (as an offset from c4 = 60) and velocity. this keeps the sequencer
+/// grid in sync with what you draw in the piano roll, so notes are visible as
+/// the pattern plays and the step engine triggers them at the right pitch.
+fn mirror_note_onto_step(track: &mut PatternTrack, length: u32, pitch: u8, start: u32, velocity: f32) {
+    if track.steps.len() != length as usize {
+        track.steps = (0..length).map(|_| Step::default()).collect();
+    }
+    let idx = (start / TICKS_PER_STEP) as usize;
+    if let Some(step) = track.steps.get_mut(idx) {
+        step.active = true;
+        step.pitch_offset = (pitch as i32 - 60).clamp(i8::MIN as i32, i8::MAX as i32) as i8;
+        step.velocity = velocity.max(0.1);
     }
 }
 
